@@ -242,6 +242,30 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 elem_id=eid("ad_negative_prompt"),
             )
 
+        with gr.Row():
+            w.ad_copy_main_loras = gr.Checkbox(
+                label="Append main prompt LoRAs" + suffix(n),
+                value=False,
+                visible=True,
+                elem_id=eid("ad_copy_main_loras"),
+                info="Append LoRA tags found in the main prompt when using a custom ADetailer prompt.",
+            )
+            w.ad_copy_main_lora_triggers = gr.Checkbox(
+                label="Append LoRA triggers" + suffix(n),
+                value=False,
+                visible=True,
+                interactive=False,
+                elem_id=eid("ad_copy_main_lora_triggers"),
+                info="If a LoRA name contains text in parentheses, also append that text as a trigger.",
+            )
+
+            w.ad_copy_main_loras.change(
+                gr_interactive,
+                inputs=w.ad_copy_main_loras,
+                outputs=w.ad_copy_main_lora_triggers,
+                queue=False,
+            )
+
     with gr.Group():
         with gr.Accordion(
             "Detection", open=False, elem_id=eid("ad_detection_accordion")

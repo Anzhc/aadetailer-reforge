@@ -59,6 +59,8 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_hires_fix_only: bool = False
     ad_prompt: str = ""
     ad_negative_prompt: str = ""
+    ad_copy_main_loras: bool = False
+    ad_copy_main_lora_triggers: bool = False
     ad_confidence: confloat(ge=0.0, le=1.0) = 0.3
     ad_mask_k_largest: NonNegativeInt = 0
     ad_mask_min_ratio: confloat(ge=0.0, le=1.0) = 0.0
@@ -130,6 +132,8 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
         ppop("ADetailer model classes")
         ppop("ADetailer prompt")
         ppop("ADetailer negative prompt")
+        ppop("ADetailer append main prompt LoRAs")
+        ppop("ADetailer append LoRA triggers")
         p.pop("ADetailer tab enable", None)  # always pop
         ppop("ADetailer hires fix only")
         ppop("ADetailer mask only top k largest", cond=0)
@@ -218,6 +222,8 @@ _all_args = [
     ("ad_hires_fix_only", "ADetailer hires fix only"),
     ("ad_prompt", "ADetailer prompt"),
     ("ad_negative_prompt", "ADetailer negative prompt"),
+    ("ad_copy_main_loras", "ADetailer append main prompt LoRAs"),
+    ("ad_copy_main_lora_triggers", "ADetailer append LoRA triggers"),
     ("ad_confidence", "ADetailer confidence"),
     ("ad_mask_k_largest", "ADetailer mask only top k largest"),
     ("ad_mask_min_ratio", "ADetailer mask min ratio"),

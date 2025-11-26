@@ -100,6 +100,11 @@ print(
 
 
 class AfterDetailerScript(scripts.Script):
+    LORA_RE = re.compile(
+        r"<([^<>]*):\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*>"
+    )
+    LORA_TRIGGER_RE = re.compile(r"\(([^()]+)\)")
+
     def __init__(self):
         super().__init__()
         self.ultralytics_device = self.get_ultralytics_device()
@@ -315,6 +320,61 @@ class AfterDetailerScript(scripts.Script):
                 prompts[n] = prompts[n].replace(pair.s, pair.r)
         return prompts
 
+    @classmethod
+    def extract_lora_trigger(cls, name: str) -> str | None:
+        match = cls.LORA_TRIGGER_RE.search(name)
+        if match:
+            trigger = match.group(1).strip()
+            if trigger:
+                return trigger
+        return None
+
+    @classmethod
+    def find_loras(cls, prompt: str) -> list["LoraInfo"]:
+        if not prompt:
+            return []
+        loras: list[LoraInfo] = []
+        seen_tokens = set()
+        for match in cls.LORA_RE.finditer(prompt):
+            token = match.group(0)
+            if token in seen_tokens:
+                continue
+            seen_tokens.add(token)
+            name = match.group(1).strip()
+            trigger = cls.extract_lora_trigger(name)
+            loras.append(LoraInfo(token=token, trigger=trigger))
+        return loras
+
+    def append_main_prompt_loras(
+        self,
+        prompts: list[str],
+        main_prompt: str,
+        *,
+        include_triggers: bool,
+    ) -> list[str]:
+        loras = self.find_loras(main_prompt)
+        if not loras:
+            return prompts
+
+        updated_prompts = []
+        for prompt in prompts:
+            additions = []
+            for lora in loras:
+                if lora.token in prompt:
+                    continue
+                addition = lora.token
+                if include_triggers and lora.trigger and lora.trigger not in prompt:
+                    addition = f"{lora.trigger} {lora.token}"
+                additions.append(addition)
+
+            if additions:
+                base_prompt = prompt.rstrip()
+                separator = ", " if base_prompt else ""
+                prompt = f"{base_prompt}{separator}{', '.join(additions)}"
+            updated_prompts.append(prompt)
+
+        return updated_prompts
+
     def get_prompt(self, p, args: ADetailerArgs) -> tuple[list[str], list[str]]:
         i = get_i(p)
         prompt_sr = p._ad_xyz_prompt_sr if hasattr(p, "_ad_xyz_prompt_sr") else []
@@ -326,6 +386,13 @@ class AfterDetailerScript(scripts.Script):
             default=p.prompt,
             replacements=prompt_sr,
         )
+        if args.ad_copy_main_loras:
+            main_prompt = self.prompt_blank_replacement(p.all_prompts, i, p.prompt)
+            prompt = self.append_main_prompt_loras(
+                prompt,
+                main_prompt,
+                include_triggers=args.ad_copy_main_lora_triggers,
+            )
         negative_prompt = self._get_prompt(
             ad_prompt=args.ad_negative_prompt,
             all_prompts=p.all_negative_prompts,
@@ -950,6 +1017,11 @@ def on_ui_settings():
 
 
 # xyz_grid
+
+
+class LoraInfo(NamedTuple):
+    token: str
+    trigger: str | None
 
 
 class PromptSR(NamedTuple):
