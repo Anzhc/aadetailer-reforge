@@ -375,6 +375,43 @@ class AfterDetailerScript(scripts.Script):
 
         return updated_prompts
 
+    @staticmethod
+    def append_tags_to_prompt(prompt: str, tags: list[str]) -> str:
+        if not tags:
+            return prompt
+
+        existing = {seg.strip().lower() for seg in prompt.split(",")}
+        new_tags = [tag for tag in tags if tag.lower() not in existing]
+        if not new_tags:
+            return prompt
+
+        base_prompt = prompt.rstrip()
+        separator = ", " if base_prompt else ""
+        return f"{base_prompt}{separator}{', '.join(new_tags)}"
+
+    def get_autotag_tags(self, image, mask, args: ADetailerArgs) -> list[str]:
+        bbox = mask.getbbox()
+        if bbox is None:
+            return []
+
+        cropped = ensure_pil_image(image, "RGB").crop(bbox)
+        try:
+            from adetailer.autotag import AutoTaggerError, autotag_image
+
+            return autotag_image(
+                cropped,
+                general_thresh=args.ad_autotag_general_thresh,
+                character_thresh=args.ad_autotag_character_thresh,
+                hide_rating=args.ad_autotag_hide_rating,
+                character_first=args.ad_autotag_character_first,
+                remove_separator=args.ad_autotag_remove_underscore,
+            )
+        except AutoTaggerError as e:
+            print(f"[-] ADetailer: autotagging disabled: {e}", file=sys.stderr)
+        except Exception:
+            traceback.print_exc()
+        return []
+
     def get_prompt(self, p, args: ADetailerArgs) -> tuple[list[str], list[str]]:
         i = get_i(p)
         prompt_sr = p._ad_xyz_prompt_sr if hasattr(p, "_ad_xyz_prompt_sr") else []
@@ -861,6 +898,10 @@ class AfterDetailerScript(scripts.Script):
 
             if re.match(r"^\s*\[SKIP\]\s*$", p2.prompt):
                 continue
+
+            if args.ad_use_autotag:
+                tags = self.get_autotag_tags(p2.init_images[0], p2.image_mask, args)
+                p2.prompt = self.append_tags_to_prompt(p2.prompt, tags)
 
             p2.seed = self.get_each_tab_seed(seed, j)
             p2.subseed = self.get_each_tab_seed(subseed, j)

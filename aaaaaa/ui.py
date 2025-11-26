@@ -266,6 +266,84 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 queue=False,
             )
 
+        with gr.Accordion(
+            "Auto tagging" + suffix(n),
+            open=False,
+            elem_id=eid("ad_autotag_accordion"),
+        ):
+            with gr.Row():
+                w.ad_use_autotag = gr.Checkbox(
+                    label="Enable auto tagging" + suffix(n),
+                    value=False,
+                    visible=True,
+                    elem_id=eid("ad_use_autotag"),
+                    info="Run a WD tagger on each detected crop and append tags to the prompt.",
+                )
+                w.ad_autotag_hide_rating = gr.Checkbox(
+                    label="Hide rating tags" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_hide_rating"),
+                )
+
+            with gr.Row():
+                w.ad_autotag_general_thresh = gr.Slider(
+                    label="General threshold" + suffix(n),
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.01,
+                    value=0.35,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_general_thresh"),
+                )
+                w.ad_autotag_character_thresh = gr.Slider(
+                    label="Character threshold" + suffix(n),
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.01,
+                    value=0.85,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_character_thresh"),
+                )
+
+            with gr.Row():
+                w.ad_autotag_character_first = gr.Checkbox(
+                    label="Character tags first" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_character_first"),
+                )
+                w.ad_autotag_remove_underscore = gr.Checkbox(
+                    label="Replace _ with space" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_remove_underscore"),
+                )
+
+            w.ad_use_autotag.change(
+                lambda value: (
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                ),
+                inputs=w.ad_use_autotag,
+                outputs=[
+                    w.ad_autotag_hide_rating,
+                    w.ad_autotag_general_thresh,
+                    w.ad_autotag_character_thresh,
+                    w.ad_autotag_character_first,
+                    w.ad_autotag_remove_underscore,
+                ],
+                queue=False,
+            )
+
     with gr.Group():
         with gr.Accordion(
             "Detection", open=False, elem_id=eid("ad_detection_accordion")

@@ -61,6 +61,12 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_negative_prompt: str = ""
     ad_copy_main_loras: bool = False
     ad_copy_main_lora_triggers: bool = False
+    ad_use_autotag: bool = False
+    ad_autotag_general_thresh: confloat(ge=0.0, le=1.0) = 0.35
+    ad_autotag_character_thresh: confloat(ge=0.0, le=1.0) = 0.85
+    ad_autotag_hide_rating: bool = True
+    ad_autotag_character_first: bool = True
+    ad_autotag_remove_underscore: bool = True
     ad_confidence: confloat(ge=0.0, le=1.0) = 0.3
     ad_mask_k_largest: NonNegativeInt = 0
     ad_mask_min_ratio: confloat(ge=0.0, le=1.0) = 0.0
@@ -134,6 +140,12 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
         ppop("ADetailer negative prompt")
         ppop("ADetailer append main prompt LoRAs")
         ppop("ADetailer append LoRA triggers")
+        ppop("ADetailer auto tag")
+        ppop("ADetailer auto tag general thresh", cond=0.35)
+        ppop("ADetailer auto tag character thresh", cond=0.85)
+        ppop("ADetailer auto tag hide rating", cond=True)
+        ppop("ADetailer auto tag character first", cond=True)
+        ppop("ADetailer auto tag remove underscore", cond=True)
         p.pop("ADetailer tab enable", None)  # always pop
         ppop("ADetailer hires fix only")
         ppop("ADetailer mask only top k largest", cond=0)
@@ -224,6 +236,12 @@ _all_args = [
     ("ad_negative_prompt", "ADetailer negative prompt"),
     ("ad_copy_main_loras", "ADetailer append main prompt LoRAs"),
     ("ad_copy_main_lora_triggers", "ADetailer append LoRA triggers"),
+    ("ad_use_autotag", "ADetailer auto tag"),
+    ("ad_autotag_general_thresh", "ADetailer auto tag general thresh"),
+    ("ad_autotag_character_thresh", "ADetailer auto tag character thresh"),
+    ("ad_autotag_hide_rating", "ADetailer auto tag hide rating"),
+    ("ad_autotag_character_first", "ADetailer auto tag character first"),
+    ("ad_autotag_remove_underscore", "ADetailer auto tag remove underscore"),
     ("ad_confidence", "ADetailer confidence"),
     ("ad_mask_k_largest", "ADetailer mask only top k largest"),
     ("ad_mask_min_ratio", "ADetailer mask min ratio"),
