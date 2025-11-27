@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import UserList
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property, partial
 from typing import Any, Literal, NamedTuple, Optional
 
@@ -68,7 +69,8 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_autotag_character_first: bool = True
     ad_autotag_remove_underscore: bool = True
     ad_confidence: confloat(ge=0.0, le=1.0) = 0.3
-    ad_mask_k_largest: NonNegativeInt = 0
+    ad_mask_filter_method: Literal["Area", "Confidence"] = "Area"
+    ad_mask_k: NonNegativeInt = 0
     ad_mask_min_ratio: confloat(ge=0.0, le=1.0) = 0.0
     ad_mask_max_ratio: confloat(ge=0.0, le=1.0) = 1.0
     ad_dilate_erode: int = 4
@@ -246,7 +248,8 @@ _all_args = [
     ("ad_autotag_character_first", "ADetailer auto tag character first"),
     ("ad_autotag_remove_underscore", "ADetailer auto tag remove underscore"),
     ("ad_confidence", "ADetailer confidence"),
-    ("ad_mask_k_largest", "ADetailer mask only top k largest"),
+    ("ad_mask_filter_method", "ADetailer method to decide top k masks"),
+    ("ad_mask_k", "ADetailer mask only top k"),
     ("ad_mask_min_ratio", "ADetailer mask min ratio"),
     ("ad_mask_max_ratio", "ADetailer mask max ratio"),
     ("ad_x_offset", "ADetailer x offset"),
@@ -293,6 +296,7 @@ BBOX_SORTBY = [
     "Position (center to edge)",
     "Area (large to small)",
 ]
+
 MASK_MERGE_INVERT = ["None", "Merge", "Merge and Invert"]
 
 _script_default = (
@@ -312,3 +316,16 @@ _builtin_script = (
     "soft_inpainting",
 )
 BUILTIN_SCRIPT = ",".join(sorted(_builtin_script))
+
+
+class InpaintBBoxMatchMode(Enum):
+    OFF = "Off"
+    STRICT = "Strict (SDXL only)"
+    FREE = "Free"
+
+
+INPAINT_BBOX_MATCH_MODES = [
+    InpaintBBoxMatchMode.OFF.value,
+    InpaintBBoxMatchMode.STRICT.value,
+    InpaintBBoxMatchMode.FREE.value,
+]

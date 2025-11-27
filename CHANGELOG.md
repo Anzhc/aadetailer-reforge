@@ -1,5 +1,44 @@
 # Changelog
 
+## 2025-03-10
+
+- v25.3.0
+- unsafe pickling 방법 변경
+
+## 2024-11-13
+
+- v24.11.1
+- `mediapipe_face_mesh`, `mediapipe_face_mesh_eyes_only` 모델에 confidences가 없어 발생하는 에러 수정
+
+## 2024-11-10
+
+- v24.11.0
+- `disable_controlnet_units` 함수가 `script_args`의 상태를 변경된 상태로 저장하는 문제 수정
+- XYZ Grid에 CFG Scale, scheduler, noise multiplier 추가
+- Area 또는 Confidence를 기준으로 마스크 최대 갯수를 지정할 수 있도록 함 (PR #720)
+
+- `ADetailer detector classes`의 element id를 `ad_classes`에서 `ad_model_classes`로 변경
+- `mediapipe` 최대 버전을 0.10.15로 제한
+
+## 2024-09-02
+
+- v24.9.0
+- Dynamic Denoising, Inpaint bbox sizing 기능 (PR #678)
+- `ad_save_images_dir` 옵션 추가 - ad 이미지를 저장하는 장소 지정 (PR #689)
+
+- forge와 관련된 버그 몇 개 수정
+- pydantic validation에 실패해도 에러를 일으키지 않고 넘어가도록 수정
+
+## 2024-08-03
+
+- v24.8.0
+- 샘플러 선택칸에 Use same sampler 옵션 추가
+- 컨트롤넷 유니온 모델을 선택할 수 있게 함
+
+- webui 1.9.0이상에서 기본 스케줄러가 설정되지 않던 문제 수정
+- issus #656의 문제 해결을 위해 v24.4.0에 적용되었던 프롬프트 표시 기능을 되돌림
+- mediapipe에서 에러가 발생하면 추론이 실패한 것으로 처리하고 조용히 넘어감
+
 ## 2024-06-16
 
 - v24.6.0

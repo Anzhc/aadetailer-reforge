@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
+from itertools import chain
 from types import SimpleNamespace
 from typing import Any
 
@@ -41,6 +42,9 @@ else:
         "scribble": ["t2ia_sketch_pidi"],
         "depth": ["depth_midas", "depth_hand_refiner"],
     }
+
+union = list(chain.from_iterable(cn_module_choices.values()))
+cn_module_choices["union"] = union
 
 
 class Widgets(SimpleNamespace):
@@ -208,7 +212,7 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 label="ADetailer detector classes" + suffix(n),
                 value="",
                 visible=False,
-                elem_id=eid("ad_classes"),
+                elem_id=eid("ad_model_classes"),
             )
 
             w.ad_model.change(
@@ -223,6 +227,7 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
     with gr.Group():
         with gr.Row(elem_id=eid("ad_toprow_prompt")):
             w.ad_prompt = gr.Textbox(
+                value="",
                 label="ad_prompt" + suffix(n),
                 show_label=False,
                 lines=3,
@@ -234,6 +239,7 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
 
         with gr.Row(elem_id=eid("ad_toprow_negative_prompt")):
             w.ad_negative_prompt = gr.Textbox(
+                value="",
                 label="ad_negative_prompt" + suffix(n),
                 show_label=False,
                 lines=2,
@@ -408,14 +414,22 @@ def detection(w: Widgets, n: int, is_img2img: bool):
                 visible=True,
                 elem_id=eid("ad_confidence"),
             )
-            w.ad_mask_k_largest = gr.Slider(
-                label="Mask only the top k largest (0 to disable)" + suffix(n),
+            w.ad_mask_filter_method = gr.Radio(
+                choices=["Area", "Confidence"],
+                value="Area",
+                label="Method to filter top k masks by (confidence or area)"
+                + suffix(n),
+                visible=True,
+                elem_id=eid("ad_mask_filter_method"),
+            )
+            w.ad_mask_k = gr.Slider(
+                label="Mask only the top k (0 to disable)" + suffix(n),
                 minimum=0,
                 maximum=10,
                 step=1,
                 value=0,
                 visible=True,
-                elem_id=eid("ad_mask_k_largest"),
+                elem_id=eid("ad_mask_k"),
             )
 
         with gr.Column(variant="compact"):
@@ -485,7 +499,7 @@ def mask_preprocessing(w: Widgets, n: int, is_img2img: bool):
             )
 
 
-def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):
+def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):  # noqa: PLR0915
     eid = partial(elem_id, n=n, is_img2img=is_img2img)
 
     with gr.Group():
@@ -692,11 +706,16 @@ def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):
                 elem_id=eid("ad_use_sampler"),
             )
 
+            sampler_names = [
+                "Use same sampler",
+                *webui_info.sampler_names,
+            ]
+
             with gr.Row():
                 w.ad_sampler = gr.Dropdown(
                     label="ADetailer sampler" + suffix(n),
-                    choices=webui_info.sampler_names,
-                    value=webui_info.sampler_names[0],
+                    choices=sampler_names,
+                    value=sampler_names[1],
                     visible=True,
                     elem_id=eid("ad_sampler"),
                 )

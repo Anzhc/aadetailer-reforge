@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # noqa: A005
 
 import io
 import platform
@@ -133,7 +133,7 @@ def get_table(title: str, data: dict[str, Any]) -> Table:
     table.add_column("Value")
     for key, value in data.items():
         if not isinstance(value, str):
-            value = repr(value)
+            value = repr(value)  # noqa: PLW2901
         table.add_row(key, value)
 
     return table

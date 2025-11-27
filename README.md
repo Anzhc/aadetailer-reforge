@@ -1,3 +1,14 @@
+# AADetailer-ReForge
+A small fork with new features and modifications, verified to work with up-to-date ReForge only. (It can potentially work with other webUIs, but i am not promising to maintain them for anything other than ReForge)  
+
+Current additional features:  
+- Automatically include loras
+- Autotag before inpaint (Autotags crop area, so inpaint is stable, and doesn't require re-prompting each gen)
+- Reworked resolution, now based on scaling. (Define a scale(multiplier) for resolution over base, so it's always bigger than original)
+
+Potential future features:
+- Class-based detection support for YOLOs.
+  
 # ADetailer
 
 ADetailer is an extension for the stable diffusion webui that does automatic masking and inpainting. It is similar to the Detection Detailer.

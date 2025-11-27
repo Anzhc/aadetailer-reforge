@@ -21,7 +21,10 @@ def mediapipe_predict(
     }
     if model_type in mapping:
         func = mapping[model_type]
-        return func(image, confidence)
+        try:
+            return func(image, confidence)
+        except Exception:
+            return PredictOutput()
     msg = f"[-] ADetailer: Invalid mediapipe model type: {model_type}, Available: {list(mapping.keys())!r}"
     raise RuntimeError(msg)
 
@@ -49,6 +52,7 @@ def mediapipe_face_detection(
     preview_array = img_array.copy()
 
     bboxes = []
+    confidences = []
     for detection in pred.detections:
         draw_util.draw_detection(preview_array, detection)
 
@@ -60,12 +64,15 @@ def mediapipe_face_detection(
         x2 = x1 + w
         y2 = y1 + h
 
+        confidences.append(detection.score)
         bboxes.append([x1, y1, x2, y2])
 
     masks = create_mask_from_bbox(bboxes, image.size)
     preview = Image.fromarray(preview_array)
 
-    return PredictOutput(bboxes=bboxes, masks=masks, preview=preview)
+    return PredictOutput(
+        bboxes=bboxes, masks=masks, confidences=confidences, preview=preview
+    )
 
 
 def mediapipe_face_mesh(
@@ -90,6 +97,7 @@ def mediapipe_face_mesh(
 
         preview = arr.copy()
         masks = []
+        confidences = []
 
         for landmarks in pred.multi_face_landmarks:
             draw_util.draw_landmarks(
@@ -109,10 +117,13 @@ def mediapipe_face_mesh(
             draw = ImageDraw.Draw(mask)
             draw.polygon(outline, fill="white")
             masks.append(mask)
+            confidences.append(1.0)  # Confidence is unknown
 
         bboxes = create_bbox_from_mask(masks, image.size)
         preview = Image.fromarray(preview)
-        return PredictOutput(bboxes=bboxes, masks=masks, preview=preview)
+        return PredictOutput(
+            bboxes=bboxes, masks=masks, confidences=confidences, preview=preview
+        )
 
 
 def mediapipe_face_mesh_eyes_only(
@@ -138,6 +149,7 @@ def mediapipe_face_mesh_eyes_only(
 
         preview = image.copy()
         masks = []
+        confidences = []
 
         for landmarks in pred.multi_face_landmarks:
             points = np.array(
@@ -153,10 +165,13 @@ def mediapipe_face_mesh_eyes_only(
             for outline in (left_outline, right_outline):
                 draw.polygon(outline, fill="white")
             masks.append(mask)
+            confidences.append(1.0)  # Confidence is unknown
 
         bboxes = create_bbox_from_mask(masks, image.size)
         preview = draw_preview(preview, bboxes, masks)
-        return PredictOutput(bboxes=bboxes, masks=masks, preview=preview)
+        return PredictOutput(
+            bboxes=bboxes, masks=masks, confidences=confidences, preview=preview
+        )
 
 
 def draw_preview(

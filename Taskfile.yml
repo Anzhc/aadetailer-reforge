@@ -10,13 +10,12 @@ tasks:
     cmds:
       - echo "$PYTHON"
       - echo "$WEBUI"
-      - echo "$UV_PYTHON"
     silent: true
 
   launch:
     dir: "{{.WEBUI}}"
     cmds:
-      - "{{.PYTHON}} launch.py --xformers --api"
+      - "{{.PYTHON}} launch.py --xformers --api {{ .CLI_ARGS }}"
     silent: true
 
   lint:
@@ -25,8 +24,8 @@ tasks:
 
   update:
     cmds:
-      - "{{.PYTHON}} -m uv pip install -U ultralytics mediapipe ruff pre-commit black devtools pytest"
+      - "{{.PYTHON}} -m uv pip install -U ultralytics mediapipe ruff pre-commit-uv black devtools pytest hypothesis"
 
   update-torch:
     cmds:
-      - "{{.PYTHON}} -m uv pip install -U torch torchvision torchaudio -f https://download.pytorch.org/whl/torch_stable.html"
+      - "{{.PYTHON}} -m uv pip install -U torch torchvision torchaudio xformers --extra-index-url https://download.pytorch.org/whl/cu126"
