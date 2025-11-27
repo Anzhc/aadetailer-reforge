@@ -85,10 +85,11 @@ def on_widget_change(state: dict, value: Any, *, attr: str):
 
 
 def on_generate_click(state: dict, *values: Any):
+    new_state = {}
     for attr, value in zip(ALL_ARGS.attrs, values):
-        state[attr] = value  # noqa: PERF403
-    state["is_api"] = ()
-    return state
+        new_state[attr] = value
+    new_state["is_api"] = ()
+    return new_state
 
 
 def on_ad_model_update(model: str):
@@ -187,6 +188,13 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 visible=True,
                 elem_id=eid("ad_tab_enable"),
             )
+            w.ad_hires_fix_only = gr.Checkbox(
+                label="Apply only on hires.fix" + suffix(n),
+                value=False,
+                visible=True,
+                elem_id=eid("ad_hires_fix_only"),
+                info="Skip this tab on the base pass and run only during hires.fix.",
+            )
 
         with gr.Row():
             w.ad_model = gr.Dropdown(
@@ -240,6 +248,118 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 + "\nIf blank, the main negative prompt is used.",
                 elem_id=eid("ad_negative_prompt"),
             )
+
+        with gr.Row():
+            w.ad_copy_main_loras = gr.Checkbox(
+                label="Append main prompt LoRAs" + suffix(n),
+                value=False,
+                visible=True,
+                elem_id=eid("ad_copy_main_loras"),
+                info="Append LoRA tags found in the main prompt when using a custom ADetailer prompt.",
+            )
+            w.ad_copy_main_lora_triggers = gr.Checkbox(
+                label="Append LoRA triggers" + suffix(n),
+                value=False,
+                visible=True,
+                interactive=False,
+                elem_id=eid("ad_copy_main_lora_triggers"),
+                info="If a LoRA name contains text in parentheses, also append that text as a trigger.",
+            )
+
+            w.ad_copy_main_loras.change(
+                gr_interactive,
+                inputs=w.ad_copy_main_loras,
+                outputs=w.ad_copy_main_lora_triggers,
+                queue=False,
+            )
+
+        with gr.Accordion(
+            "Auto tagging" + suffix(n),
+            open=False,
+            elem_id=eid("ad_autotag_accordion"),
+        ):
+            with gr.Row():
+                w.ad_use_autotag = gr.Checkbox(
+                    label="Enable auto tagging" + suffix(n),
+                    value=False,
+                    visible=True,
+                    elem_id=eid("ad_use_autotag"),
+                    info="Run a WD tagger on each detected crop and append tags to the prompt.",
+                )
+                w.ad_autotag_hide_rating = gr.Checkbox(
+                    label="Hide rating tags" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_hide_rating"),
+                )
+
+            with gr.Row():
+                w.ad_autotag_general_thresh = gr.Slider(
+                    label="General threshold" + suffix(n),
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.01,
+                    value=0.35,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_general_thresh"),
+                )
+                w.ad_autotag_character_thresh = gr.Slider(
+                    label="Character threshold" + suffix(n),
+                    minimum=0.0,
+                    maximum=1.0,
+                    step=0.01,
+                    value=0.85,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_character_thresh"),
+                )
+
+            with gr.Row():
+                w.ad_autotag_character_first = gr.Checkbox(
+                    label="Character tags first" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_character_first"),
+                )
+                w.ad_autotag_remove_underscore = gr.Checkbox(
+                    label="Replace _ with space" + suffix(n),
+                    value=True,
+                    visible=True,
+                    interactive=False,
+                    elem_id=eid("ad_autotag_remove_underscore"),
+                )
+
+            w.ad_use_autotag.change(
+                lambda value: (
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                    gr_interactive(value),
+                ),
+                inputs=w.ad_use_autotag,
+                outputs=[
+                    w.ad_autotag_hide_rating,
+                    w.ad_autotag_general_thresh,
+                    w.ad_autotag_character_thresh,
+                    w.ad_autotag_character_first,
+                    w.ad_autotag_remove_underscore,
+                ],
+                queue=False,
+            )
+
+            initial_autotag_enabled = bool(w.ad_use_autotag.value)
+            for comp in (
+                w.ad_autotag_hide_rating,
+                w.ad_autotag_general_thresh,
+                w.ad_autotag_character_thresh,
+                w.ad_autotag_character_first,
+                w.ad_autotag_remove_underscore,
+            ):
+                comp.interactive = initial_autotag_enabled
 
     with gr.Group():
         with gr.Accordion(
@@ -438,7 +558,7 @@ def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):  # 
                 )
 
                 w.ad_inpaint_width = gr.Slider(
-                    label="inpaint width" + suffix(n),
+                    label="Minimum inpaint width" + suffix(n),
                     minimum=64,
                     maximum=2048,
                     step=4,
@@ -448,7 +568,7 @@ def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):  # 
                 )
 
                 w.ad_inpaint_height = gr.Slider(
-                    label="inpaint height" + suffix(n),
+                    label="Minimum inpaint height" + suffix(n),
                     minimum=64,
                     maximum=2048,
                     step=4,
@@ -457,12 +577,38 @@ def inpainting(w: Widgets, n: int, is_img2img: bool, webui_info: WebuiInfo):  # 
                     elem_id=eid("ad_inpaint_height"),
                 )
 
+                w.ad_inpaint_scale = gr.Slider(
+                    label="Inpaint scale" + suffix(n),
+                    minimum=0.1,
+                    maximum=8.0,
+                    step=0.05,
+                    value=1.0,
+                    visible=True,
+                    elem_id=eid("ad_inpaint_scale"),
+                    info="Multiply detected crop size by this factor before enforcing minimums.",
+                )
+
                 w.ad_use_inpaint_width_height.change(
                     lambda value: (gr_interactive(value), gr_interactive(value)),
                     inputs=w.ad_use_inpaint_width_height,
                     outputs=[w.ad_inpaint_width, w.ad_inpaint_height],
                     queue=False,
                 )
+                w.ad_use_inpaint_width_height.change(
+                    gr_interactive,
+                    inputs=w.ad_use_inpaint_width_height,
+                    outputs=w.ad_inpaint_scale,
+                    queue=False,
+                )
+
+                if w.ad_use_inpaint_width_height.value:
+                    w.ad_inpaint_width.interactive = True
+                    w.ad_inpaint_height.interactive = True
+                    w.ad_inpaint_scale.interactive = True
+                else:
+                    w.ad_inpaint_width.interactive = False
+                    w.ad_inpaint_height.interactive = False
+                    w.ad_inpaint_scale.interactive = False
 
         with gr.Row():
             with gr.Column(variant="compact"):

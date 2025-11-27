@@ -30,9 +30,23 @@ PT = Union[StableDiffusionProcessingTxt2Img, StableDiffusionProcessingImg2Img]
 
 @contextmanager
 def change_torch_load():
+    """Temporarily relax torch.load restrictions for third-party checkpoints."""
     orig = torch.load
+
+    def unsafe_load(*args, **kwargs):
+        needs_weights_only = "weights_only" not in kwargs
+        if needs_weights_only:
+            kwargs["weights_only"] = False
+        try:
+            return safe.unsafe_torch_load(*args, **kwargs)
+        except TypeError as exc:
+            if needs_weights_only and "weights_only" in kwargs and "unexpected keyword argument 'weights_only'" in str(exc):
+                kwargs.pop("weights_only", None)
+                return safe.unsafe_torch_load(*args, **kwargs)
+            raise
+
     try:
-        torch.load = safe.unsafe_torch_load
+        torch.load = unsafe_load
         yield
     finally:
         torch.load = orig

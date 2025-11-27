@@ -104,6 +104,11 @@ print(
 
 
 class AfterDetailerScript(scripts.Script):
+    LORA_RE = re.compile(
+        r"<([^<>]*):\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*>"
+    )
+    LORA_TRIGGER_RE = re.compile(r"\(([^()]+)\)")
+
     def __init__(self):
         super().__init__()
         self.ultralytics_device = self.get_ultralytics_device()
@@ -228,6 +233,14 @@ class AfterDetailerScript(scripts.Script):
         p.width = 128
         p.height = 128
 
+    @staticmethod
+    def is_hires_pass(p, *, allow_enable_hr: bool = False) -> bool:
+        if getattr(p, "_ad_is_hr_pass", False) or getattr(p, "is_hr_pass", False):
+            return True
+        if allow_enable_hr and getattr(p, "enable_hr", False):
+            return True
+        return False
+
     def get_args(self, p, *args_) -> list[ADetailerArgs]:
         args = [arg for arg in args_ if isinstance(arg, dict)]
 
@@ -306,6 +319,98 @@ class AfterDetailerScript(scripts.Script):
                 prompts[n] = prompts[n].replace(pair.s, pair.r)
         return prompts
 
+    @classmethod
+    def extract_lora_trigger(cls, name: str) -> str | None:
+        match = cls.LORA_TRIGGER_RE.search(name)
+        if match:
+            trigger = match.group(1).strip()
+            if trigger:
+                return trigger
+        return None
+
+    @classmethod
+    def find_loras(cls, prompt: str) -> list["LoraInfo"]:
+        if not prompt:
+            return []
+        loras: list[LoraInfo] = []
+        seen_tokens = set()
+        for match in cls.LORA_RE.finditer(prompt):
+            token = match.group(0)
+            if token in seen_tokens:
+                continue
+            seen_tokens.add(token)
+            name = match.group(1).strip()
+            trigger = cls.extract_lora_trigger(name)
+            loras.append(LoraInfo(token=token, trigger=trigger))
+        return loras
+
+    def append_main_prompt_loras(
+        self,
+        prompts: list[str],
+        main_prompt: str,
+        *,
+        include_triggers: bool,
+    ) -> list[str]:
+        loras = self.find_loras(main_prompt)
+        if not loras:
+            return prompts
+
+        updated_prompts = []
+        for prompt in prompts:
+            additions = []
+            for lora in loras:
+                if lora.token in prompt:
+                    continue
+                addition = lora.token
+                if include_triggers and lora.trigger and lora.trigger not in prompt:
+                    addition = f"{lora.trigger} {lora.token}"
+                additions.append(addition)
+
+            if additions:
+                base_prompt = prompt.rstrip()
+                separator = ", " if base_prompt else ""
+                prompt = f"{base_prompt}{separator}{', '.join(additions)}"
+            updated_prompts.append(prompt)
+
+        return updated_prompts
+
+    @staticmethod
+    def append_tags_to_prompt(prompt: str, tags: list[str]) -> str:
+        if not tags:
+            return prompt
+
+        existing = {seg.strip().lower() for seg in prompt.split(",")}
+        new_tags = [tag for tag in tags if tag.lower() not in existing]
+        if not new_tags:
+            return prompt
+
+        base_prompt = prompt.rstrip()
+        separator = ", " if base_prompt else ""
+        return f"{base_prompt}{separator}{', '.join(new_tags)}"
+
+    def get_autotag_tags(self, image, mask, args: ADetailerArgs) -> list[str]:
+        bbox = mask.getbbox()
+        if bbox is None:
+            return []
+
+        cropped = ensure_pil_image(image, "RGB").crop(bbox)
+        try:
+            from adetailer.autotag import AutoTaggerError, autotag_image
+
+            return autotag_image(
+                cropped,
+                general_thresh=args.ad_autotag_general_thresh,
+                character_thresh=args.ad_autotag_character_thresh,
+                hide_rating=args.ad_autotag_hide_rating,
+                character_first=args.ad_autotag_character_first,
+                remove_separator=args.ad_autotag_remove_underscore,
+            )
+        except AutoTaggerError as e:
+            print(f"[-] ADetailer: autotagging disabled: {e}", file=sys.stderr)
+        except Exception:
+            traceback.print_exc()
+        return []
+
     def get_prompt(self, p, args: ADetailerArgs) -> tuple[list[str], list[str]]:
         i = get_i(p)
         prompt_sr = p._ad_xyz_prompt_sr if hasattr(p, "_ad_xyz_prompt_sr") else []
@@ -317,6 +422,13 @@ class AfterDetailerScript(scripts.Script):
             default=p.prompt,
             replacements=prompt_sr,
         )
+        if args.ad_copy_main_loras:
+            main_prompt = self.prompt_blank_replacement(p.all_prompts, i, p.prompt)
+            prompt = self.append_main_prompt_loras(
+                prompt,
+                main_prompt,
+                include_triggers=args.ad_copy_main_lora_triggers,
+            )
         negative_prompt = self._get_prompt(
             ad_prompt=args.ad_negative_prompt,
             all_prompts=p.all_negative_prompts,
@@ -360,6 +472,36 @@ class AfterDetailerScript(scripts.Script):
             height = p.height
 
         return width, height
+
+    def get_inpaint_size_for_mask(
+        self,
+        mask: Image.Image,
+        args: ADetailerArgs,
+        *,
+        fallback_width: int,
+        fallback_height: int,
+    ) -> tuple[int, int]:
+        if not args.ad_use_inpaint_width_height:
+            return fallback_width, fallback_height
+
+        bbox = mask.getbbox()
+        if bbox is None:
+            return fallback_width, fallback_height
+
+        w = max(bbox[2] - bbox[0], 1)
+        h = max(bbox[3] - bbox[1], 1)
+
+        scaled_w = max(1, round(w * args.ad_inpaint_scale))
+        scaled_h = max(1, round(h * args.ad_inpaint_scale))
+
+        min_w = args.ad_inpaint_width
+        min_h = args.ad_inpaint_height
+
+        up_scale = max(min_w / scaled_w, min_h / scaled_h, 1.0)
+        target_w = int(round(scaled_w * up_scale))
+        target_h = int(round(scaled_h * up_scale))
+
+        return target_w, target_h
 
     def get_steps(self, p, args: ADetailerArgs) -> int:
         if args.ad_use_steps:
@@ -772,6 +914,8 @@ class AfterDetailerScript(scripts.Script):
         if getattr(p, "_ad_disabled", False):
             return
 
+        p._ad_is_hr_pass = False
+
         if is_img2img_inpaint(p) and is_all_black(self.get_image_mask(p)):
             p._ad_disabled = True
             msg = (
@@ -798,8 +942,23 @@ class AfterDetailerScript(scripts.Script):
             arg_list[0].ad_prompt = replaced_positive_prompt[0]
             arg_list[0].ad_negative_prompt = replaced_negative_prompt[0]
 
-        extra_params = self.extra_params(arg_list)
+        applicable_args = [
+            arg
+            for arg in arg_list
+            if not (arg.ad_hires_fix_only and not self.is_hires_pass(p, allow_enable_hr=True))
+        ]
+
+        if not applicable_args:
+            p._ad_disabled = True
+            return
+
+        extra_params = self.extra_params(applicable_args)
         p.extra_generation_params.update(extra_params)
+
+    def before_hr(self, p, *args_):
+        if getattr(p, "_ad_disabled", False):
+            return
+        p._ad_is_hr_pass = True
 
     def _postprocess_image_inner(
         self, p, pp: PPImage, args: ADetailerArgs, *, n: int = 0
@@ -859,6 +1018,7 @@ class AfterDetailerScript(scripts.Script):
             print(f"mediapipe: {steps} detected.")
 
         p2 = copy(i2i)
+        base_width, base_height = i2i.width, i2i.height
         for j in range(steps):
             p2.image_mask = masks[j]
             p2.init_images[0] = ensure_pil_image(p2.init_images[0], "RGB")
@@ -867,7 +1027,19 @@ class AfterDetailerScript(scripts.Script):
             if re.match(r"^\s*\[SKIP\]\s*$", p2.prompt):
                 continue
 
-            self.fix_p2(p, p2, pp, args, pred, j)
+            if args.ad_use_autotag:
+                tags = self.get_autotag_tags(p2.init_images[0], p2.image_mask, args)
+                p2.prompt = self.append_tags_to_prompt(p2.prompt, tags)
+
+            p2.width, p2.height = self.get_inpaint_size_for_mask(
+                p2.image_mask,
+                args,
+                fallback_width=base_width,
+                fallback_height=base_height,
+            )
+
+            p2.seed = self.get_each_tab_seed(seed, j)
+            p2.subseed = self.get_each_tab_seed(subseed, j)
 
             try:
                 processed = process_images(p2)
@@ -912,6 +1084,8 @@ class AfterDetailerScript(scripts.Script):
         with CNHijackRestore(), pause_total_tqdm(), cn_allow_script_control():
             for n, args in enumerate(arg_list):
                 if args.need_skip():
+                    continue
+                if args.ad_hires_fix_only and not self.is_hires_pass(p):
                     continue
                 is_processed |= self._postprocess_image_inner(p, pp, args, n=n)
 
@@ -1059,6 +1233,11 @@ def on_ui_settings():
 
 
 # xyz_grid
+
+
+class LoraInfo(NamedTuple):
+    token: str
+    trigger: str | None
 
 
 class PromptSR(NamedTuple):

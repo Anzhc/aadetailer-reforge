@@ -57,8 +57,17 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_model: str = "None"
     ad_model_classes: str = ""
     ad_tab_enable: bool = True
+    ad_hires_fix_only: bool = False
     ad_prompt: str = ""
     ad_negative_prompt: str = ""
+    ad_copy_main_loras: bool = False
+    ad_copy_main_lora_triggers: bool = False
+    ad_use_autotag: bool = False
+    ad_autotag_general_thresh: confloat(ge=0.0, le=1.0) = 0.35
+    ad_autotag_character_thresh: confloat(ge=0.0, le=1.0) = 0.85
+    ad_autotag_hide_rating: bool = True
+    ad_autotag_character_first: bool = True
+    ad_autotag_remove_underscore: bool = True
     ad_confidence: confloat(ge=0.0, le=1.0) = 0.3
     ad_mask_filter_method: Literal["Area", "Confidence"] = "Area"
     ad_mask_k: NonNegativeInt = 0
@@ -73,8 +82,9 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_inpaint_only_masked: bool = True
     ad_inpaint_only_masked_padding: NonNegativeInt = 32
     ad_use_inpaint_width_height: bool = False
-    ad_inpaint_width: PositiveInt = 512
-    ad_inpaint_height: PositiveInt = 512
+    ad_inpaint_width: PositiveInt = 512  # minimum width
+    ad_inpaint_height: PositiveInt = 512  # minimum height
+    ad_inpaint_scale: confloat(ge=0.1, le=8.0) = 1.0
     ad_use_steps: bool = False
     ad_steps: PositiveInt = 28
     ad_use_cfg_scale: bool = False
@@ -131,12 +141,17 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
         ppop("ADetailer model classes")
         ppop("ADetailer prompt")
         ppop("ADetailer negative prompt")
+        ppop("ADetailer append main prompt LoRAs")
+        ppop("ADetailer append LoRA triggers")
+        ppop("ADetailer auto tag")
+        ppop("ADetailer auto tag general thresh", cond=0.35)
+        ppop("ADetailer auto tag character thresh", cond=0.85)
+        ppop("ADetailer auto tag hide rating", cond=True)
+        ppop("ADetailer auto tag character first", cond=True)
+        ppop("ADetailer auto tag remove underscore", cond=True)
         p.pop("ADetailer tab enable", None)  # always pop
-        ppop(
-            "ADetailer mask only top k",
-            ["ADetailer mask only top k", "ADetailer method to decide top k masks"],
-            cond=0,
-        )
+        ppop("ADetailer hires fix only")
+        ppop("ADetailer mask only top k largest", cond=0)
         ppop("ADetailer mask min ratio", cond=0.0)
         ppop("ADetailer mask max ratio", cond=1.0)
         ppop("ADetailer x offset", cond=0)
@@ -147,10 +162,12 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
             "ADetailer use inpaint width height",
             [
                 "ADetailer use inpaint width height",
-                "ADetailer inpaint width",
-                "ADetailer inpaint height",
+                "ADetailer min inpaint width",
+                "ADetailer min inpaint height",
+                "ADetailer inpaint scale",
             ],
         )
+        ppop("ADetailer inpaint scale", cond=1.0)
         ppop(
             "ADetailer use separate steps",
             ["ADetailer use separate steps", "ADetailer steps"],
@@ -219,8 +236,17 @@ _all_args = [
     ("ad_model", "ADetailer model"),
     ("ad_model_classes", "ADetailer model classes"),
     ("ad_tab_enable", "ADetailer tab enable"),
+    ("ad_hires_fix_only", "ADetailer hires fix only"),
     ("ad_prompt", "ADetailer prompt"),
     ("ad_negative_prompt", "ADetailer negative prompt"),
+    ("ad_copy_main_loras", "ADetailer append main prompt LoRAs"),
+    ("ad_copy_main_lora_triggers", "ADetailer append LoRA triggers"),
+    ("ad_use_autotag", "ADetailer auto tag"),
+    ("ad_autotag_general_thresh", "ADetailer auto tag general thresh"),
+    ("ad_autotag_character_thresh", "ADetailer auto tag character thresh"),
+    ("ad_autotag_hide_rating", "ADetailer auto tag hide rating"),
+    ("ad_autotag_character_first", "ADetailer auto tag character first"),
+    ("ad_autotag_remove_underscore", "ADetailer auto tag remove underscore"),
     ("ad_confidence", "ADetailer confidence"),
     ("ad_mask_filter_method", "ADetailer method to decide top k masks"),
     ("ad_mask_k", "ADetailer mask only top k"),
@@ -235,8 +261,9 @@ _all_args = [
     ("ad_inpaint_only_masked", "ADetailer inpaint only masked"),
     ("ad_inpaint_only_masked_padding", "ADetailer inpaint padding"),
     ("ad_use_inpaint_width_height", "ADetailer use inpaint width height"),
-    ("ad_inpaint_width", "ADetailer inpaint width"),
-    ("ad_inpaint_height", "ADetailer inpaint height"),
+    ("ad_inpaint_width", "ADetailer min inpaint width"),
+    ("ad_inpaint_height", "ADetailer min inpaint height"),
+    ("ad_inpaint_scale", "ADetailer inpaint scale"),
     ("ad_use_steps", "ADetailer use separate steps"),
     ("ad_steps", "ADetailer steps"),
     ("ad_use_cfg_scale", "ADetailer use separate CFG scale"),
@@ -282,7 +309,12 @@ _script_default = (
 )
 SCRIPT_DEFAULT = ",".join(sorted(_script_default))
 
-_builtin_script = ("soft_inpainting", "hypertile_script")
+_builtin_script = (
+    "advanced_model_sampling_script",
+    "advanced_model_sampling_script_backported",
+    "hypertile_script",
+    "soft_inpainting",
+)
 BUILTIN_SCRIPT = ",".join(sorted(_builtin_script))
 
 
