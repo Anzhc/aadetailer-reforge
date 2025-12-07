@@ -265,11 +265,32 @@ def one_ui_group(n: int, is_img2img: bool, webui_info: WebuiInfo):
                 elem_id=eid("ad_copy_main_lora_triggers"),
                 info="If a LoRA name contains text in parentheses, also append that text as a trigger.",
             )
+            w.ad_copy_main_lora_triggers_only = gr.Checkbox(
+                label="Add only used triggers" + suffix(n),
+                value=False,
+                visible=True,
+                interactive=False,
+                elem_id=eid("ad_copy_main_lora_triggers_only"),
+                info="Only append LoRA triggers that already appear in the main prompt.",
+            )
 
             w.ad_copy_main_loras.change(
-                gr_interactive,
-                inputs=w.ad_copy_main_loras,
-                outputs=w.ad_copy_main_lora_triggers,
+                lambda copy_loras, include_triggers: (
+                    gr_interactive(copy_loras),
+                    gr_interactive(copy_loras and include_triggers),
+                ),
+                inputs=[w.ad_copy_main_loras, w.ad_copy_main_lora_triggers],
+                outputs=[
+                    w.ad_copy_main_lora_triggers,
+                    w.ad_copy_main_lora_triggers_only,
+                ],
+                queue=False,
+            )
+
+            w.ad_copy_main_lora_triggers.change(
+                lambda include_triggers: gr_interactive(include_triggers),
+                inputs=w.ad_copy_main_lora_triggers,
+                outputs=w.ad_copy_main_lora_triggers_only,
                 queue=False,
             )
 

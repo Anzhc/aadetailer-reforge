@@ -62,6 +62,7 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
     ad_negative_prompt: str = ""
     ad_copy_main_loras: bool = False
     ad_copy_main_lora_triggers: bool = False
+    ad_copy_main_lora_triggers_only: bool = False
     ad_use_autotag: bool = False
     ad_autotag_general_thresh: confloat(ge=0.0, le=1.0) = 0.35
     ad_autotag_character_thresh: confloat(ge=0.0, le=1.0) = 0.85
@@ -143,6 +144,7 @@ class ADetailerArgs(BaseModel, extra=Extra.forbid):
         ppop("ADetailer negative prompt")
         ppop("ADetailer append main prompt LoRAs")
         ppop("ADetailer append LoRA triggers")
+        ppop("ADetailer append only used LoRA triggers")
         ppop("ADetailer auto tag")
         ppop("ADetailer auto tag general thresh", cond=0.35)
         ppop("ADetailer auto tag character thresh", cond=0.85)
@@ -241,6 +243,7 @@ _all_args = [
     ("ad_negative_prompt", "ADetailer negative prompt"),
     ("ad_copy_main_loras", "ADetailer append main prompt LoRAs"),
     ("ad_copy_main_lora_triggers", "ADetailer append LoRA triggers"),
+    ("ad_copy_main_lora_triggers_only", "ADetailer append only used LoRA triggers"),
     ("ad_use_autotag", "ADetailer auto tag"),
     ("ad_autotag_general_thresh", "ADetailer auto tag general thresh"),
     ("ad_autotag_character_thresh", "ADetailer auto tag character thresh"),

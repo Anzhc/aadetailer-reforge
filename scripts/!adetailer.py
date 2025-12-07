@@ -320,13 +320,13 @@ class AfterDetailerScript(scripts.Script):
         return prompts
 
     @classmethod
-    def extract_lora_trigger(cls, name: str) -> str | None:
-        match = cls.LORA_TRIGGER_RE.search(name)
-        if match:
+    def extract_lora_triggers(cls, name: str) -> tuple[str, ...]:
+        triggers: list[str] = []
+        for match in cls.LORA_TRIGGER_RE.finditer(name):
             trigger = match.group(1).strip()
-            if trigger:
-                return trigger
-        return None
+            if trigger and trigger not in triggers:
+                triggers.append(trigger)
+        return tuple(triggers)
 
     @classmethod
     def find_loras(cls, prompt: str) -> list["LoraInfo"]:
@@ -340,8 +340,8 @@ class AfterDetailerScript(scripts.Script):
                 continue
             seen_tokens.add(token)
             name = match.group(1).strip()
-            trigger = cls.extract_lora_trigger(name)
-            loras.append(LoraInfo(token=token, trigger=trigger))
+            triggers = cls.extract_lora_triggers(name)
+            loras.append(LoraInfo(token=token, triggers=triggers))
         return loras
 
     def append_main_prompt_loras(
@@ -350,21 +350,43 @@ class AfterDetailerScript(scripts.Script):
         main_prompt: str,
         *,
         include_triggers: bool,
+        only_used_triggers: bool,
     ) -> list[str]:
         loras = self.find_loras(main_prompt)
         if not loras:
             return prompts
+        main_prompt_without_loras = self.LORA_RE.sub("", main_prompt)
 
         updated_prompts = []
         for prompt in prompts:
-            additions = []
+            additions: list[str] = []
+            seen_additions: set[str] = set()
             for lora in loras:
-                if lora.token in prompt:
+                if lora.token in prompt or lora.token in seen_additions:
                     continue
-                addition = lora.token
-                if include_triggers and lora.trigger and lora.trigger not in prompt:
-                    addition = f"{lora.trigger} {lora.token}"
-                additions.append(addition)
+                triggers_to_add: list[str] = []
+                if include_triggers and lora.triggers:
+                    triggers_to_add = [
+                        trigger for trigger in lora.triggers if trigger not in prompt
+                    ]
+                    if only_used_triggers:
+                        triggers_to_add = [
+                            trigger
+                            for trigger in triggers_to_add
+                            if trigger in main_prompt_without_loras
+                        ]
+                    triggers_to_add = [
+                        trigger
+                        for trigger in triggers_to_add
+                        if trigger not in seen_additions
+                    ]
+
+                for trigger in triggers_to_add:
+                    additions.append(trigger)
+                    seen_additions.add(trigger)
+
+                additions.append(lora.token)
+                seen_additions.add(lora.token)
 
             if additions:
                 base_prompt = prompt.rstrip()
@@ -428,6 +450,7 @@ class AfterDetailerScript(scripts.Script):
                 prompt,
                 main_prompt,
                 include_triggers=args.ad_copy_main_lora_triggers,
+                only_used_triggers=args.ad_copy_main_lora_triggers_only,
             )
         negative_prompt = self._get_prompt(
             ad_prompt=args.ad_negative_prompt,
@@ -1238,7 +1261,7 @@ def on_ui_settings():
 
 class LoraInfo(NamedTuple):
     token: str
-    trigger: str | None
+    triggers: tuple[str, ...]
 
 
 class PromptSR(NamedTuple):
